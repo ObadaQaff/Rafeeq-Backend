@@ -1,0 +1,20 @@
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Django database
+#db.sqlite3
+
+# Static / media (optional)
+static/
+media/
+
+# macOS system files
+.DS_Store
+
