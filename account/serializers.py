@@ -30,9 +30,4 @@ class UserSerializer(serializers.ModelSerializer):
 
 class SmartVisionRequestSerializer(serializers.Serializer):
     image = serializers.CharField(help_text="Base64 encoded image")
-    credentials = serializers.CharField(help_text="Google Vision JSON credentials")
-    conf_threshold = serializers.FloatField(required=False, default=0.5)
-    enable_ocr = serializers.BooleanField(required=False, default=True)
-    force_announce = serializers.BooleanField(required=False, default=False)
-
-
+  

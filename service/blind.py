@@ -14,11 +14,17 @@ import json
 
 class SmartVisionSystem:
     def __init__(self, credentials_json_string): 
-        credentials_dict = json.loads(credentials_json_string)
+        
+        credentials_dict = credentials_json_string
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         self.vision_client = vision.ImageAnnotatorClient(credentials=credentials)
         
-        self.depth_model = torch.hub.load("intel-isl/MiDaS", "DPT_Hybrid")
+        self.depth_model = torch.hub.load(
+                                        "intel-isl/MiDaS",
+                                        "DPT_Hybrid",
+                                        trust_repo=True
+                                    )
+
         self.depth_transform = torch.hub.load("intel-isl/MiDaS", "transforms").dpt_transform
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -478,3 +484,7 @@ class SmartVisionSystem:
             return filename
         except Exception as e:
             return None
+        
+
+
+'/Users/obadaqafisheh/Downloads/IMG_5023.HEIC'

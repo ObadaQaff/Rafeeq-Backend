@@ -2,12 +2,14 @@ from rest_framework import generics, permissions, viewsets
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
-from .serializers import RegisterSerializer, UserSerializer
+from .serializers import RegisterSerializer, SmartVisionRequestSerializer, UserSerializer
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from service.blind import SmartVisionSystem
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework.parsers import JSONParser
 
 
 class RegisterView(generics.CreateAPIView):
@@ -78,45 +80,50 @@ class DeleteOwnAccountView(generics.DestroyAPIView):
         return self.request.user
     
 
-
-
 class SmartVisionView(APIView):
-  # You can change to AllowAny
+    parser_classes = [JSONParser]
 
+
+    dic = {
+   
+    }
+
+    @swagger_auto_schema(
+        request_body=SmartVisionRequestSerializer,
+        responses={200: "Success", 400: "Bad Request"}
+    )
     def post(self, request, *args, **kwargs):
-        from .serializers import SmartVisionRequestSerializer
-
+    
         serializer = SmartVisionRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
         try:
-            system = SmartVisionSystem(credentials_json_string=data["credentials"])
+            system = SmartVisionSystem(
+                credentials_json_string=self.dic
+            )
 
             audio_file = system.process_image_from_flutter(
                 base64_image=data["image"],
-                conf_threshold=data["conf_threshold"],
-                enable_ocr=data["enable_ocr"],
-                force_announce=data["force_announce"],
+                conf_threshold=0.5,
+                enable_ocr=True,
+                force_announce=False,
             )
 
-            if audio_file is None:
+            if not audio_file:
                 return Response(
-                    {"success": False, "message": "No objects detected."},
-                    status=status.HTTP_200_OK
+                    {"success": False, "message": "No objects detected"},
+                    status=200
                 )
 
             return Response(
-                {
-                    "success": True,
-                    "audio_file": audio_file,
-                    "message": "Audio generated successfully"
-                },
-                status=status.HTTP_200_OK
+                {"success": True, "audio_file": audio_file},
+                status=200
             )
 
         except Exception as e:
             return Response(
                 {"success": False, "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=500
             )
+
