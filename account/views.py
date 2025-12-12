@@ -11,6 +11,7 @@ from service.blind import SmartVisionSystem
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.parsers import JSONParser
 
+from rest_framework.parsers import MultiPartParser, FormParser
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -81,7 +82,7 @@ class DeleteOwnAccountView(generics.DestroyAPIView):
     
 
 class SmartVisionView(APIView):
-    parser_classes = [JSONParser]
+    parser_classes = [MultiPartParser, FormParser]
 
 
     dic = {#انسخي الكود هون 

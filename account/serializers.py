@@ -29,5 +29,5 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class SmartVisionRequestSerializer(serializers.Serializer):
-    image = serializers.CharField(help_text="Base64 encoded image")
+    image = serializers.ImageField()
   
