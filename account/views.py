@@ -84,8 +84,7 @@ class SmartVisionView(APIView):
     parser_classes = [JSONParser]
 
 
-    dic = {
-   
+    dic = {#انسخي الكود هون 
     }
 
     @swagger_auto_schema(
