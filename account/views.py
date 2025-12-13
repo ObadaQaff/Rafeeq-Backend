@@ -10,7 +10,6 @@ from rest_framework.views import APIView
 from service.blind import SmartVisionSystem
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.parsers import JSONParser
-
 from rest_framework.parsers import MultiPartParser, FormParser
 
 class RegisterView(generics.CreateAPIView):
@@ -85,8 +84,9 @@ class SmartVisionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
 
-    dic = {#انسخي الكود هون 
-    }
+    dic = {
+ #انسخي الكود هون
+}
 
     @swagger_auto_schema(
         request_body=SmartVisionRequestSerializer,

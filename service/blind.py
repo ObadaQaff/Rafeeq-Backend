@@ -11,6 +11,13 @@ import os
 import time
 from deep_translator import GoogleTranslator
 import json
+from vision_models import depth_model, depth_transform
+from django.conf import settings
+import os
+import debugpy
+
+
+
 
 class SmartVisionSystem:
     def __init__(self, credentials_json_string): 
@@ -19,13 +26,8 @@ class SmartVisionSystem:
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         self.vision_client = vision.ImageAnnotatorClient(credentials=credentials)
         
-        self.depth_model = torch.hub.load(
-                                        "intel-isl/MiDaS",
-                                        "DPT_Hybrid",
-                                        trust_repo=True
-                                    )
-
-        self.depth_transform = torch.hub.load("intel-isl/MiDaS", "transforms").dpt_transform
+        self.depth_model = depth_model
+        self.depth_transform = depth_transform
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.depth_model.to(self.device)
@@ -68,6 +70,19 @@ class SmartVisionSystem:
             img_bgr = img_array
         
         return img_bgr
+    def load_image_from_file(self, image_file):
+        image_bytes = image_file.read()
+
+        pil_image = Image.open(io.BytesIO(image_bytes))
+
+        if pil_image.mode != "RGB":
+            pil_image = pil_image.convert("RGB")
+
+        image_np = np.array(pil_image)
+        image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+
+        return image_bgr
+
     
     def get_position_description(self, center_x, image_width):
         left_boundary = image_width * 0.33
@@ -113,6 +128,7 @@ class SmartVisionSystem:
         return count >= self.min_detection_frames
     
     def detect_objects(self, image, conf_threshold=0.5):
+
         _, encoded = cv2.imencode('.jpg', image)
         content = encoded.tobytes()
         
@@ -424,9 +440,10 @@ class SmartVisionSystem:
         return total_chars > 0 and arabic_chars / total_chars > 0.5
     
     def process_image_from_flutter(self, base64_image, conf_threshold=0.5, enable_ocr=True, force_announce=False):
+        #debugpy.breakpoint()   # ← forces attach NOW
 
         try:
-            image = self.decode_base64_image(base64_image)
+            image = self.load_image_from_file(base64_image)
             detection = self.detect_objects(image, conf_threshold)
             
             if not detection['labels']:
@@ -448,17 +465,17 @@ class SmartVisionSystem:
                 
                 obj_key = f"{obj['label']}_{int(guidance['distance_meters']*10)}_{obj['position']['position']}"
                 
-                if force_announce:
+                """if force_announce:
                     should_announce = True
                 else:
                     is_consistent = self.update_detection_history(obj_key)
-                    should_announce = is_consistent and self.should_announce(obj_key)
+                    should_announce = is_consistent and self.should_announce(obj_key)"""
                 
-                if should_announce:
-                    announcements.append({
-                        'priority': priority,
-                        'message_ar': guidance['message_ar']
-                    })
+                """if should_announce:"""
+                announcements.append({
+                    'priority': priority,
+                    'message_ar': guidance['message_ar']
+                })
             
             if not announcements:
                 return None
@@ -468,23 +485,22 @@ class SmartVisionSystem:
             top_messages = [item['message_ar'] for item in announcements[:3]]
             combined_text = ". ".join(top_messages)
             
-            audio_file = self.generate_audio(combined_text, language='ar')
-            
+            audio_file = self.generate_audio(combined_text, language='ar')       
             return audio_file
             
         except Exception as e:
             return None
     
     def generate_audio(self, text, language='ar'):
-        try:
-            timestamp = int(time.time() * 1000)
-            filename = f"audio_{timestamp}.mp3"
-            tts = gTTS(text=text, lang=language, slow=False)
-            tts.save(filename)
-            return filename
-        except Exception as e:
-            return None
-        
+        timestamp = int(time.time() * 1000)
+        filename = f"audio_{timestamp}.mp3"
+        output_path = os.path.join(settings.MEDIA_ROOT, "audio", filename)
 
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        tts = gTTS(text=text, lang=language)
+        tts.save(output_path)
+
+        return settings.MEDIA_URL + "audio/" + filename
 
 '/Users/obadaqafisheh/Downloads/IMG_5023.HEIC'
