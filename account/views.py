@@ -12,6 +12,12 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework.parsers import JSONParser
 from rest_framework.parsers import MultiPartParser, FormParser
 
+
+
+
+#---------------
+# User View
+#---------------
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     permission_classes = [permissions.AllowAny]
@@ -80,12 +86,40 @@ class DeleteOwnAccountView(generics.DestroyAPIView):
         return self.request.user
     
 
+#---------------
+# Post View
+#---------------
+from .serializers import PostSerializer
+from .models import Post
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+
+
+
+class CreatePostView(generics.CreateAPIView):
+    serializer_class = PostSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = PostSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+#----------------
+# Smart Vision View
+#----------------
 class SmartVisionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
 
     dic = {
- #انسخي الكود هون
+ 
 }
 
     @swagger_auto_schema(

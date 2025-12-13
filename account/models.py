@@ -17,3 +17,20 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return f"{self.username} - {self.user_type}"    
+class Post(models.Model):
+
+    HELP_WAITING = 0
+    IN_HELP_TRIP = 1
+    FINISHED = 2
+
+    STATE_CHOICES = [
+        (HELP_WAITING, 'Help Waiting'),
+        (IN_HELP_TRIP, 'In Help Trip'),
+        (FINISHED, 'Finished Helped'),
+    ]
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='posts')
+    state = models.IntegerField(choices=STATE_CHOICES, default=HELP_WAITING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

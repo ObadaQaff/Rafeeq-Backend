@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import CustomUser
+from .models import CustomUser, Post
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
@@ -31,3 +31,10 @@ class UserSerializer(serializers.ModelSerializer):
 class SmartVisionRequestSerializer(serializers.Serializer):
     image = serializers.ImageField()
   
+class PostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ['id', 'title', 'content', 'author','state', 'created_at', 'updated_at']
+    def create(self, validated_data):
+        post = Post.objects.create(**validated_data)
+        return post

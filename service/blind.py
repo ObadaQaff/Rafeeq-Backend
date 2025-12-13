@@ -14,7 +14,6 @@ import json
 from vision_models import depth_model, depth_transform
 from django.conf import settings
 import os
-import debugpy
 
 
 
