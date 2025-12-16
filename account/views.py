@@ -11,13 +11,21 @@ from service.blind import SmartVisionSystem
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.parsers import JSONParser
 from rest_framework.parsers import MultiPartParser, FormParser
-
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import CustomTokenObtainPairSerializer
 
 
 
 #---------------
 # User View
 #---------------
+
+
+
+class CustomLoginView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     permission_classes = [permissions.AllowAny]
