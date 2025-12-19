@@ -3,6 +3,8 @@ from django.contrib.auth.password_validation import validate_password
 from .models import CustomUser, Post
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from rest_framework import viewsets, permissions
+from .models import Post
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
@@ -70,3 +72,23 @@ class PostSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         post = Post.objects.create(**validated_data)
         return post
+    
+
+
+
+
+
+class PostSerializer(serializers.ModelSerializer):
+    author = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = Post
+        fields = [
+            'id',
+            'title',
+            'content',
+            'author',
+            'state',
+            'created_at',
+            'updated_at',
+        ]

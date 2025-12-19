@@ -12,16 +12,13 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework.parsers import JSONParser
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import CustomTokenObtainPairSerializer
+from .serializers import *
 
 
 
 #---------------
 # User View
 #---------------
-
-
-
 class CustomLoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
@@ -97,12 +94,20 @@ class DeleteOwnAccountView(generics.DestroyAPIView):
 #---------------
 # Post View
 #---------------
-from .serializers import PostSerializer
+"""from .serializers import PostSerializer
 from .models import Post
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
 
+"""
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
 
 
 class CreatePostView(generics.CreateAPIView):

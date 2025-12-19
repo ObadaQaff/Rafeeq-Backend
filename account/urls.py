@@ -5,6 +5,7 @@ from .views import *
 
 router = DefaultRouter()
 router.register('users', UserViewSet, basename='user')
+router.register('posts', PostViewSet, basename='post')
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
