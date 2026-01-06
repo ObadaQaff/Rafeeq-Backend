@@ -13,15 +13,25 @@ from rest_framework.parsers import JSONParser
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import *
-
-
+from .models import Post
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework.permissions import AllowAny
+from .models import City
+from .serializers import CitySerializer
+import base64
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import STTRequestSerializer
+from service.TTS.STT.STT import ASLTranslatorFinal
 
 #---------------
 # User View
 #---------------
 class CustomLoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
-
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -63,11 +73,11 @@ class RegisterView(generics.CreateAPIView):
                 "message": "An unexpected error occurred.",
                 "error": str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 # View / edit users (admin-only)
 class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
 
 # Custom logout endpoint
 class LogoutView(APIView):
@@ -82,7 +92,6 @@ class LogoutView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
 class DeleteOwnAccountView(generics.DestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = UserSerializer
@@ -90,38 +99,66 @@ class DeleteOwnAccountView(generics.DestroyAPIView):
     def get_object(self):
         return self.request.user
     
-
-#---------------
-# Post View
-#---------------
-"""from .serializers import PostSerializer
-from .models import Post
-class PostViewSet(viewsets.ModelViewSet):
-    queryset = Post.objects.all()
-    serializer_class = PostSerializer
-
-"""
-class PostViewSet(viewsets.ModelViewSet):
-    queryset = Post.objects.all()
-    serializer_class = PostSerializer
+#----------------
+# City ViewSet
+#----------------
+class CityViewSet(viewsets.ModelViewSet):
+    queryset = City.objects.all()
+    serializer_class = CitySerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+    swagger_tags = ["Cities"]
 
+    def create(self, request, *args, **kwargs):
+            
+        return super().create(request, *args, **kwargs)
 
-class CreatePostView(generics.CreateAPIView):
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_authenticated or not request.user.is_staff:
+            return Response(
+                {"detail": "Only admin users can update cities."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not request.user.is_authenticated or not request.user.is_staff:
+            return Response(
+                {"detail": "Only admin users can delete cities."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_summary="List cities",
+        operation_description="Public endpoint to list all cities"
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+#----------------
+# Post ViewSet
+#----------------
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all()
     serializer_class = PostSerializer
+    permission_classes = [AllowAny]
 
-    def post(self, request, *args, **kwargs):
-        serializer = PostSerializer(data=request.data)
+    swagger_tags = ["Posts"]
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication required to create a post."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
+        serializer.save(author=request.user)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 #----------------
@@ -130,9 +167,8 @@ class CreatePostView(generics.CreateAPIView):
 class SmartVisionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
-
+    #Api google 
     dic = {
- 
 }
 
     @swagger_auto_schema(
@@ -174,3 +210,51 @@ class SmartVisionView(APIView):
                 status=500
             )
 
+#----------------
+# STT ViewSet
+#----------------
+class STTView(APIView):
+    permission_classes = []  # AllowAny
+    @swagger_auto_schema(
+        request_body=STTRequestSerializer,
+        responses={200: "Success"}
+    )
+    def post(self, request):
+        serializer = STTRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        frames_base64 = serializer.validated_data['frames']
+
+        # Decode base64 → bytes
+        frames_bytes = []
+        for frame in frames_base64:
+            try:
+                frames_bytes.append(base64.b64decode(frame))
+            except Exception:
+                return Response(
+                    {"success": False, "error": "Invalid base64 frame"},
+                    status=400
+                )
+
+        translator = ASLTranslatorFinal()
+        result = translator.process_frames_from_flutter(frames_bytes)
+
+        if not result['success']:
+            return Response(result, status=400)
+
+        # Convert bytes → base64 for Flutter
+        response = {
+            "success": True,
+            "has_audio": result["has_audio"],
+            "has_text": result["has_text"],
+            "audio_file": (
+                base64.b64encode(result["audio_file"]).decode()
+                if result["audio_file"] else None
+            ),
+            "text_file": (
+                result["text_file"].decode("utf-8")
+                if result["text_file"] else None
+            )
+        }
+
+        return Response(response, status=200)

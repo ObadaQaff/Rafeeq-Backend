@@ -1,9 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import CustomUser, Post
+from .models import City, CustomUser, Post
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
-from rest_framework import viewsets, permissions
 from .models import Post
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -34,8 +32,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         return data
 
-
-
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
 
@@ -43,8 +39,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ['username', 'email', 'phone', 'age', 'address','gender', 'can_write','can_speak_with_sign_language'
                   ,'is_active', 'user_type', 'password']
-
-
+        
     """def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Passwords do not match."})
@@ -54,30 +49,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = CustomUser.objects.create_user(**validated_data)
         return user
 
-
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['id', 'username', 'email', 'phone', 'age', 'address','gender', 'can_write','can_speak_with_sign_language'
                   ,'is_active', 'user_type']
 
-
 class SmartVisionRequestSerializer(serializers.Serializer):
     image = serializers.ImageField()
   
-class PostSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Post
-        fields = ['id', 'title', 'content', 'author','state', 'created_at', 'updated_at']
-    def create(self, validated_data):
-        post = Post.objects.create(**validated_data)
-        return post
-    
-
-
-
-
-
 class PostSerializer(serializers.ModelSerializer):
     author = serializers.StringRelatedField(read_only=True)
 
@@ -87,8 +67,23 @@ class PostSerializer(serializers.ModelSerializer):
             'id',
             'title',
             'content',
-            'author',
+            'city',      # FK → client sends ID
+            'author',    # FK → read-only
             'state',
             'created_at',
             'updated_at',
         ]
+
+class CitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = City
+        fields = ['id', 'name'] 
+    def create(self, validated_data):
+        city = City.objects.create(**validated_data)
+        return city    
+    
+class STTRequestSerializer(serializers.Serializer):
+    frames = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False
+    )
