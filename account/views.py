@@ -16,16 +16,12 @@ from .serializers import *
 from .models import Post
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from drf_yasg.utils import swagger_auto_schema
 from rest_framework.permissions import AllowAny
 from .models import City
 from .serializers import CitySerializer
 import base64
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 from .serializers import STTRequestSerializer
-from service.TTS.STT.STT import ASLTranslatorFinal
+from service.STT.STT import ASLTranslatorFinal
 
 #---------------
 # User View
