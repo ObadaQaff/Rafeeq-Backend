@@ -17,23 +17,30 @@ import os
 
 from google.cloud import vision
 
-
-
 class SmartVisionSystem:
-    def __init__(self): 
-        
-        credentials_dict = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    def __init__(self):
 
-        credentials = service_account.Credentials.from_service_account_info(credentials_dict)
-        self.vision_client = vision.ImageAnnotatorClient(credentials=credentials)
-        
+        credentials_str = os.getenv("GOOGLE_VISION_CREDENTIALS")
+        if not credentials_str:
+            raise Exception("GOOGLE_VISION_CREDENTIALS not found")
+
+        credentials_dict = json.loads(credentials_str)
+
+        credentials = service_account.Credentials.from_service_account_info(
+            credentials_dict
+        )
+
+        self.vision_client = vision.ImageAnnotatorClient(
+            credentials=credentials
+        )
+
         self.depth_model = depth_model
         self.depth_transform = depth_transform
-        
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.depth_model.to(self.device)
         self.depth_model.eval()
-        
+
         self.translator = GoogleTranslator(source='auto', target='ar')
         
         self.last_announcements = {}
