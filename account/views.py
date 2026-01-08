@@ -163,10 +163,6 @@ class PostViewSet(viewsets.ModelViewSet):
 class SmartVisionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
-    #Api google 
-    dic = {
-}
-
     @swagger_auto_schema(
         request_body=SmartVisionRequestSerializer,
         responses={200: "Success", 400: "Bad Request"}
@@ -178,9 +174,7 @@ class SmartVisionView(APIView):
         data = serializer.validated_data
 
         try:
-            system = SmartVisionSystem(
-                credentials_json_string=self.dic
-            )
+            system = SmartVisionSystem()
 
             audio_file = system.process_image_from_flutter(
                 base64_image=data["image"],

@@ -13,13 +13,9 @@ import io
 
 class ASLTranslatorFinal:
     def __init__(self, gemini_api_key=None):
-        if gemini_api_key is None:
-            try:
-                with open(r"C:\Users\DELLI511\vc\STT\API.txt", 'r') as f:
-                    gemini_api_key = f.read().strip()
-            except:
-                raise Exception("API key file not found")
-        
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+    
+           
         self.client = genai.Client(api_key=gemini_api_key)
         self.model_name = 'gemini-2.0-flash-exp'
         

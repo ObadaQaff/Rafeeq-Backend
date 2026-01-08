@@ -15,13 +15,15 @@ from vision_models import depth_model, depth_transform
 from django.conf import settings
 import os
 
+from google.cloud import vision
 
 
 
 class SmartVisionSystem:
-    def __init__(self, credentials_json_string): 
+    def __init__(self): 
         
-        credentials_dict = credentials_json_string
+        credentials_dict = vision.ImageAnnotatorClient()
+
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         self.vision_client = vision.ImageAnnotatorClient(credentials=credentials)
         
