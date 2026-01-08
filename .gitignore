@@ -1,4 +1,3 @@
-
 # Virtual environments
 .venv/
 venv/
@@ -9,15 +8,19 @@ __pycache__/
 *.pyc
 
 # Django database
-#db.sqlite3
+db.sqlite3
 
-# Static / media (optional)
+# Static / media
 static/
 media/
 
-# macOS system files
-.DS_Store
+# Secrets
+.env
+google_vision.json
 
-.vscode/launch.json
+# macOS / editors
+.DS_Store
+.vscode/
 debugpy/
-audio
+audio/
+
