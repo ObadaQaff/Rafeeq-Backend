@@ -22,7 +22,7 @@ from google.cloud import vision
 class SmartVisionSystem:
     def __init__(self): 
         
-        credentials_dict = vision.ImageAnnotatorClient()
+        credentials_dict = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         self.vision_client = vision.ImageAnnotatorClient(credentials=credentials)
