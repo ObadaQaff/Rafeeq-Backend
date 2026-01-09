@@ -32,51 +32,43 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         return data
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True)
-    assistant = serializers.PrimaryKeyRelatedField(
-        queryset=CustomUser.objects.filter(user_type='assistant'),
-        required=False,
-        allow_null=True
-    )
+    password = serializers.CharField(write_only=True)
+    assistant = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = CustomUser
         fields = [
             'username', 'email', 'phone', 'age', 'address',
             'gender', 'can_write', 'can_speak_with_sign_language',
-            'is_active', 'user_type',  'assistant','password',
-             # ✅ حقل جديد
+            'is_active', 'user_type', 'assistant', 'password'
         ]
 
     def validate(self, attrs):
         user_type = attrs.get('user_type')
         assistant = attrs.get('assistant')
 
-        # blind / deaf لازم يكون عنده assistant
-        if user_type in ['blind', 'deaf']:
-            if not assistant:
-                raise serializers.ValidationError({
-                    "assistant": "Blind/Deaf user must have an assistant."
-                })
+        # Flutter يرسل 0 → نعتبره None
+        if assistant == 0:
+            attrs['assistant'] = None
 
-            if assistant.user_type != 'assistant':
-                raise serializers.ValidationError({
-                    "assistant": "Assigned user must be an assistant."
-                })
-
-        # assistant نفسه ما لازم يكون له assistant
-        if user_type == 'assistant' and assistant:
+        # blind / deaf لازم يكون لهم assistant
+        if user_type in ['blind', 'deaf'] and not attrs.get('assistant'):
             raise serializers.ValidationError({
-                "assistant": "Assistant user cannot have an assistant."
+                "assistant": "Blind or deaf user must have an assistant."
             })
+
+        # assistant لا يجب أن يكون له assistant
+        if user_type == 'assistant':
+            attrs['assistant'] = None
 
         return attrs
 
     def create(self, validated_data):
+        password = validated_data.pop('password')
         user = CustomUser.objects.create_user(**validated_data)
+        user.set_password(password)
+        user.save()
         return user
-
-
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
