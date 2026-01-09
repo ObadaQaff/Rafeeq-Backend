@@ -495,13 +495,15 @@ class SmartVisionSystem:
     def generate_audio(self, text, language='ar'):
         timestamp = int(time.time() * 1000)
         filename = f"audio_{timestamp}.mp3"
-        output_path = os.path.join(settings.MEDIA_ROOT, "audio", filename)
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        output_path = os.path.join(settings.MEDIA_ROOT, filename)
+
+        os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
 
         tts = gTTS(text=text, lang=language)
         tts.save(output_path)
 
-        return settings.MEDIA_URL + "audio/" + filename
+        return settings.MEDIA_URL + filename
+
 
 '/Users/obadaqafisheh/Downloads/IMG_5023.HEIC'
