@@ -10,31 +10,46 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
 
-        # Optional: add claims into the token itself
         token['username'] = user.username
         token['email'] = user.email
-        token['age'] = getattr(user, 'age', None)
+        token['user_type'] = user.user_type
 
         return token
 
     def validate(self, attrs):
         data = super().validate(attrs)
 
-        # Add user info to response body
-        data.update({
-            "user": {
-                "id": self.user.id,
-                "username": self.user.username,
-                "email": self.user.email,
-                "user_type": self.user.user_type
-            }
-        })
+        user_data = {
+            "id": self.user.id,
+            "username": self.user.username,
+            "email": self.user.email,
+            "user_type": self.user.user_type,
+        }
 
+        # 🔹 إذا Assistant → رجّع المرضى (blind / deaf)
+        if self.user.user_type == 'assistant':
+            patients = self.user.patients.filter(
+                user_type__in=['blind', 'deaf']
+            ).values('id', 'username', 'user_type')
+
+            user_data["patient"] = patients[0]
+
+        # 🔹 إذا Blind / Deaf → رجّع assistant
+        if self.user.user_type in ['blind', 'deaf']:
+            user_data["assistant_id"] = (
+                self.user.assistant.id if self.user.assistant else None
+            )
+
+        data["user"] = user_data
         return data
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-    assistant = serializers.IntegerField(required=False, allow_null=True)
-
+    assistant = serializers.PrimaryKeyRelatedField(
+            queryset=CustomUser.objects.filter(user_type='assistant'),
+            required=False,
+            allow_null=True)
+        
     class Meta:
         model = CustomUser
         fields = [
@@ -65,7 +80,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password')
-        user = CustomUser.objects.create_user(**validated_data)
+        assistant = validated_data.pop('assistant', None)
+
+        user = CustomUser(**validated_data)
+        if assistant:
+            user.assistant = assistant
+
         user.set_password(password)
         user.save()
         return user
@@ -79,21 +99,6 @@ class UserSerializer(serializers.ModelSerializer):
 class SmartVisionRequestSerializer(serializers.Serializer):
     image = serializers.ImageField()
   
-class PostSerializer(serializers.ModelSerializer):
-    author = serializers.StringRelatedField(read_only=True)
-
-    class Meta:
-        model = Post
-        fields = [
-            'id',
-            'title',
-            'content',
-            'city',      # FK → client sends ID
-            'author',    # FK → read-only
-            'state',
-            'created_at',
-            'updated_at',
-        ]
 
 class CitySerializer(serializers.ModelSerializer):
     class Meta:
@@ -103,6 +108,31 @@ class CitySerializer(serializers.ModelSerializer):
         city = City.objects.create(**validated_data)
         return city    
     
+
+class PostSerializer(serializers.ModelSerializer):
+    author = serializers.StringRelatedField(read_only=True)
+    city = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(),
+        write_only=True
+    )
+    city_data = CitySerializer(source='city', read_only=True)
+
+    class Meta:
+        model = Post
+        fields = [
+            'id',
+            'title',
+            'content',
+            'city',      # FK → client sends ID
+            'city_data', 
+            'author',    # FK → read-only
+            'state',
+            'created_at',
+            'updated_at',
+        ]
+
+
+
 class STTRequestSerializer(serializers.Serializer):
     frames = serializers.ListField(
         child=serializers.CharField(),
