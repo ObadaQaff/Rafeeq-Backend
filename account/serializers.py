@@ -31,23 +31,52 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         })
 
         return data
-
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
+    assistant = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.filter(user_type='assistant'),
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'phone', 'age', 'address','gender', 'can_write','can_speak_with_sign_language'
-                  ,'is_active', 'user_type', 'password']
-        
-    """def validate(self, attrs):
-        if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({"password": "Passwords do not match."})
-        return attrs"""
+        fields = [
+            'username', 'email', 'phone', 'age', 'address',
+            'gender', 'can_write', 'can_speak_with_sign_language',
+            'is_active', 'user_type',  'assistant','password',
+             # ✅ حقل جديد
+        ]
+
+    def validate(self, attrs):
+        user_type = attrs.get('user_type')
+        assistant = attrs.get('assistant')
+
+        # blind / deaf لازم يكون عنده assistant
+        if user_type in ['blind', 'deaf']:
+            if not assistant:
+                raise serializers.ValidationError({
+                    "assistant": "Blind/Deaf user must have an assistant."
+                })
+
+            if assistant.user_type != 'assistant':
+                raise serializers.ValidationError({
+                    "assistant": "Assigned user must be an assistant."
+                })
+
+        # assistant نفسه ما لازم يكون له assistant
+        if user_type == 'assistant' and assistant:
+            raise serializers.ValidationError({
+                "assistant": "Assistant user cannot have an assistant."
+            })
+
+        return attrs
 
     def create(self, validated_data):
         user = CustomUser.objects.create_user(**validated_data)
         return user
+
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

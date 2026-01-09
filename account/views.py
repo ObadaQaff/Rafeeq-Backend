@@ -51,7 +51,8 @@ class RegisterView(generics.CreateAPIView):
                     "user_type": user.user_type,
                     "gender": user.gender,
                     "can_write": user.can_write,
-                    "can_speak_with_sign_language": user.can_speak_with_sign_language
+                    "can_speak_with_sign_language": user.can_speak_with_sign_language,
+                    "assistant": user.assistant.id if user.assistant else None
                 }
             }, status=status.HTTP_201_CREATED)
 

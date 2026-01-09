@@ -1,23 +1,75 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.core.exceptions import ValidationError
+
+
 class CustomUser(AbstractUser):
-    phone = models.CharField(max_length=15, unique=True, null=False, blank=False)
+    phone = models.CharField(max_length=15, unique=True)
+
     age = models.PositiveIntegerField(null=True, blank=True)
     address = models.CharField(max_length=255, blank=True, null=True)
-    user_type = models.CharField(max_length=20, 
-        choices=[('assistant', 'assistant'), ('volunteer', 'volunteer'),
-                ('blind','blind'),('deaf','deaf')], default='volunteer')
-    gender = models.CharField(max_length=10,choices=[('male', 'male'),('female', 'female')] ,default='male')
-    can_write = models.BooleanField(default=False,null=True, blank=True)
-    can_speak_with_sign_language = models.BooleanField(default=False,null=True, blank=True)
+
+    USER_TYPES = [
+        ('assistant', 'assistant'),
+        ('blind', 'blind'),
+        ('deaf', 'deaf'),
+        ('volunteer', 'volunteer'),
+    ]
+
+    user_type = models.CharField(
+        max_length=20,
+        choices=USER_TYPES,
+        default='volunteer'
+    )
+
+    gender = models.CharField(
+        max_length=10,
+        choices=[('male', 'male'), ('female', 'female')],
+        default='male'
+    )
+
+    can_write = models.BooleanField(default=False)
+    can_speak_with_sign_language = models.BooleanField(default=False)
+
+    # 🔑 assistant فقط لـ blind & deaf
+    assistant = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='patients',
+        limit_choices_to={'user_type': 'assistant'}
+    )
+
     is_active = models.BooleanField(default=True)
-    
-    REQUIRED_FIELDS = ['age', 'address', 'phone', 'user_type', 'gender', 'can_write', 'can_speak_with_sign_language']
+
+    REQUIRED_FIELDS = ['phone']
+
+    # -----------------
+    # Business rules
+    # -----------------
+    def clean(self):
+        # assistant لا يكون له assistant
+        if self.user_type == 'assistant' and self.assistant is not None:
+            raise ValidationError("Assistant cannot have an assistant.")
+
+        # blind / deaf لازم يكون لهم assistant
+        if self.user_type in ['blind', 'deaf'] and self.assistant is None:
+            raise ValidationError("Blind and Deaf users must have an assistant.")
+
+        # volunteer لا يكون له assistant
+        if self.user_type == 'volunteer' and self.assistant is not None:
+            raise ValidationError("Volunteer cannot have an assistant.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.username} - {self.user_type}"    
-
+        return f"{self.username} - {self.user_type}"
 
 from django.conf import settings
 from django.db import models
