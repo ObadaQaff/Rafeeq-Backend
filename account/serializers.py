@@ -9,40 +9,48 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-
         token['username'] = user.username
         token['email'] = user.email
         token['user_type'] = user.user_type
-
         return token
 
     def validate(self, attrs):
         data = super().validate(attrs)
+        user = self.user
 
         user_data = {
-            "id": self.user.id,
-            "username": self.user.username,
-            "email": self.user.email,
-            "user_type": self.user.user_type,
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "user_type": user.user_type,
         }
 
-        # 🔹 إذا Assistant → رجّع المرضى (blind / deaf)
-        patients = list(
-            self.user.patients.filter(
-                user_type__in=['blind', 'deaf']
-            ).values('id', 'username', 'user_type')
-        )
+        # ✅ Assistant → رجّع patient واحد فقط
+        if user.user_type == 'assistant':
+            patient = (
+                user.patients
+                .filter(user_type__in=['blind', 'deaf'])
+                .values('id', 'username', 'email', 'user_type')
+                .first()
+            )
+            user_data["patient"] = patient
 
-        user_data["patient"] = patients[0] if patients else None
-
-        # 🔹 إذا Blind / Deaf → رجّع assistant
-        if self.user.user_type in ['blind', 'deaf']:
-            user_data["assistant_id"] = (
-                self.user.assistant.id if self.user.assistant else None
+        # ✅ Blind / Deaf → رجّع assistant object
+        if user.user_type in ['blind', 'deaf']:
+            user_data["assistant"] = (
+                {
+                    "id": user.assistant.id,
+                    "username": user.assistant.username,
+                    "email": user.assistant.email,
+                    "user_type": user.assistant.user_type,
+                }
+                if user.assistant else None
             )
 
         data["user"] = user_data
         return data
+
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -147,3 +155,7 @@ class STTRequestSerializer(serializers.Serializer):
         child=serializers.CharField(),
         allow_empty=False
     )
+class AssistantMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'email', 'user_type']
