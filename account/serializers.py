@@ -27,12 +27,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         }
 
         # 🔹 إذا Assistant → رجّع المرضى (blind / deaf)
-        if self.user.user_type == 'assistant':
-            patients = self.user.patients.filter(
+        patients = list(
+            self.user.patients.filter(
                 user_type__in=['blind', 'deaf']
             ).values('id', 'username', 'user_type')
+        )
 
-            user_data["patient"] = patients[0]
+        user_data["patient"] = patients[0] if patients else None
 
         # 🔹 إذا Blind / Deaf → رجّع assistant
         if self.user.user_type in ['blind', 'deaf']:
@@ -45,11 +46,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-    assistant = serializers.PrimaryKeyRelatedField(
-            queryset=CustomUser.objects.filter(user_type='assistant'),
-            required=False,
-            allow_null=True)
-        
+    assistant = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = CustomUser
         fields = [
@@ -60,35 +58,48 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         user_type = attrs.get('user_type')
-        assistant = attrs.get('assistant')
+        assistant_id = attrs.get('assistant')
 
-        # Flutter يرسل 0 → نعتبره None
-        if assistant == 0:
+        # Flutter يرسل 0 → None
+        if assistant_id in [0, '0', None]:
             attrs['assistant'] = None
+            assistant = None
+        else:
+            try:
+                assistant = CustomUser.objects.get(
+                    id=assistant_id,
+                    user_type='assistant'
+                )
+                attrs['assistant'] = assistant
+            except CustomUser.DoesNotExist:
+                raise serializers.ValidationError({
+                    "assistant": "Assistant not found."
+                })
 
-        # blind / deaf لازم يكون لهم assistant
+        # blind / deaf لازم assistant
         if user_type in ['blind', 'deaf'] and not attrs.get('assistant'):
             raise serializers.ValidationError({
                 "assistant": "Blind or deaf user must have an assistant."
             })
 
-        # assistant لا يجب أن يكون له assistant
+        # assistant لا يكون له assistant
         if user_type == 'assistant':
             attrs['assistant'] = None
 
         return attrs
+
 
     def create(self, validated_data):
         password = validated_data.pop('password')
         assistant = validated_data.pop('assistant', None)
 
         user = CustomUser(**validated_data)
-        if assistant:
-            user.assistant = assistant
-
+        user.assistant = assistant
         user.set_password(password)
         user.save()
+
         return user
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -130,8 +141,6 @@ class PostSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-
-
 
 class STTRequestSerializer(serializers.Serializer):
     frames = serializers.ListField(
