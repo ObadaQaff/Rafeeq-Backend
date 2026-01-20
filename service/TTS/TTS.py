@@ -6,7 +6,6 @@ import tempfile
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 import speech_recognition as sr
-from moviepy.editor import VideoFileClip, concatenate_videoclips
 from difflib import SequenceMatcher
 
 class SignLanguageVideoGenerator:
@@ -73,7 +72,7 @@ class SignLanguageVideoGenerator:
             'بكره': ['غدا', 'بكرة', 'غداً'],
         }
         
-        # Build reverse lookup
+        # Build reverse lookup. 
         self.reverse_synonyms = {}
         for word, synonyms_list in self.synonyms.items():
             for synonym in synonyms_list:
@@ -481,6 +480,7 @@ class SignLanguageVideoGenerator:
             return None
     
     def detect_motion_boundaries(self, video_path):
+        
         import cv2
         import numpy as np
         
@@ -537,6 +537,8 @@ class SignLanguageVideoGenerator:
         return start_time, end_time
     
     def trim_video_smart(self, video_path):
+        from moviepy.editor import VideoFileClip  # <- lazy import
+
         try:
             start_time, end_time = self.detect_motion_boundaries(video_path)
             clip = VideoFileClip(video_path)
@@ -558,6 +560,7 @@ class SignLanguageVideoGenerator:
             return clip.subclip(start, end)
     
     def merge_sign_videos(self, video_paths):
+        from moviepy.editor import VideoFileClip, concatenate_videoclips  # <- lazy import
         if not video_paths:
             return None
         

@@ -4,8 +4,12 @@ from .models import City, CustomUser, Post
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import Post
 
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    device_token = serializers.CharField(
+        required=False,
+        allow_blank=True
+    )
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -15,9 +19,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        device_token = attrs.pop("device_token", None)
         data = super().validate(attrs)
         user = self.user
 
+        if device_token:
+            user.device_token = device_token
+            user.save(update_fields=["device_token"])
+        
         user_data = {
             "id": user.id,
             "username": user.username,
@@ -51,7 +60,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
-
+#user registration serializer
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     assistant = serializers.IntegerField(required=False, allow_null=True)
@@ -61,7 +70,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             'username', 'email', 'phone', 'age', 'address',
             'gender', 'can_write', 'can_speak_with_sign_language',
-            'is_active', 'user_type', 'assistant', 'password'
+            'is_active', 'user_type', 'assistant', 'password','device_token'
         ]
 
     def validate(self, attrs):
@@ -112,13 +121,13 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'phone', 'age', 'address','gender', 'can_write','can_speak_with_sign_language'
-                  ,'is_active', 'user_type']
+        fields = ['id', 'username', 'email', 'phone', 'age', 'address','curent_location','in_home','gender', 'can_write','can_speak_with_sign_language'
+                  ,'is_active', 'user_type','device_token']
 
 class SmartVisionRequestSerializer(serializers.Serializer):
     image = serializers.ImageField()
   
-
+#city serializer
 class CitySerializer(serializers.ModelSerializer):
     class Meta:
         model = City
@@ -127,7 +136,7 @@ class CitySerializer(serializers.ModelSerializer):
         city = City.objects.create(**validated_data)
         return city    
     
-
+#post serializer
 class PostSerializer(serializers.ModelSerializer):
     author = serializers.StringRelatedField(read_only=True)
     city = serializers.PrimaryKeyRelatedField(
@@ -145,6 +154,8 @@ class PostSerializer(serializers.ModelSerializer):
             'city',      # FK → client sends ID
             'city_data', 
             'author',    # FK → read-only
+            'volunteer',
+            'help_requesters',
             'state',
             'created_at',
             'updated_at',
@@ -159,3 +170,20 @@ class AssistantMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['id', 'username', 'email', 'user_type']
+class SignLanguageRequestSerializer(serializers.Serializer):
+    input_type = serializers.ChoiceField(
+        choices=["text", "audio"],
+        help_text="Input type: text or base64 audio"
+    )
+    input_data = serializers.CharField(
+        help_text="Arabic text OR base64-encoded audio"
+    )
+
+class SignLanguageResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    recognized_text = serializers.CharField(allow_null=True)
+    video_base64 = serializers.CharField(allow_null=True)
+    missing_words = serializers.ListField(child=serializers.CharField())
+    found_matches = serializers.ListField()
+    total_signs = serializers.IntegerField(required=False)
+    error = serializers.CharField(required=False)

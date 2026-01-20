@@ -14,6 +14,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import *
 from .models import Post
+from rest_framework.decorators import action
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -22,6 +23,8 @@ from .serializers import CitySerializer
 import base64
 from .serializers import STTRequestSerializer
 from service.STT.STT import ASLTranslatorFinal
+from .serializers import SignLanguageRequestSerializer, SignLanguageResponseSerializer
+from service.TTS.TTS import SignLanguageVideoGenerator
 
 #---------------
 # User View
@@ -139,9 +142,54 @@ class CityViewSet(viewsets.ModelViewSet):
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     swagger_tags = ["Posts"]
+
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="request-help"
+    )
+    def request_help(self, request, pk=None):
+        post = self.get_object()
+        user = request.user
+
+        # ❌ Author cannot request help
+        if user == post.author:
+            return Response(
+                {"detail": "Author cannot request help"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ❌ Only volunteers can request help
+        if user.user_type != "volunteer":
+            return Response(
+                {"detail": "Only volunteers can request help"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # ❌ Already requested
+        if post.help_requesters.filter(id=user.id).exists():
+            return Response(
+                {"detail": "You already requested to help"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ❌ Volunteer already chosen
+        if post.volunteer:
+            return Response(
+                {"detail": "Volunteer already selected"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        post.help_requesters.add(user)
+
+        return Response(
+            {"detail": "Request to help added successfully"},
+            status=status.HTTP_200_OK
+        )
 
     def create(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -249,3 +297,48 @@ class STTView(APIView):
         }
 
         return Response(response, status=200)
+    
+
+
+
+
+
+
+
+SIGN_GENERATOR = SignLanguageVideoGenerator(
+    signs_dict_path="/Users/obadaqafisheh/Rafeeq/Rafeeq/service/TTS/signs_dictionary.json"
+)
+
+
+class SignLanguageView(APIView):
+    permission_classes = []  # AllowAny
+
+    @swagger_auto_schema(
+        operation_summary="Convert Arabic text or audio to sign language video",
+        operation_description="""
+        - Send **Arabic text** OR **base64 audio**
+        - Returns **merged sign language video (base64)**
+        - Reports missing words and fuzzy matches
+        """,
+        request_body=SignLanguageRequestSerializer,
+        responses={
+            200: SignLanguageResponseSerializer,
+            400: "Bad Request"
+        }
+    )
+    def post(self, request):
+        serializer = SignLanguageRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        input_type = serializer.validated_data["input_type"]
+        input_data = serializer.validated_data["input_data"]
+
+        result = SIGN_GENERATOR.process_from_flutter(
+            input_data=input_data,
+            input_type=input_type
+        )
+
+        if not result.get("success"):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(result, status=status.HTTP_200_OK)

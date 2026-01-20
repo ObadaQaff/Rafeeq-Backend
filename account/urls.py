@@ -20,5 +20,7 @@ urlpatterns = [
     path('delete-account/', DeleteOwnAccountView.as_view(), name='delete-account'),
     path('vision/', SmartVisionView.as_view(), name='smart-vision'),
     path("stt/", STTView.as_view(), name="stt"),
+    path("sign-language/", SignLanguageView.as_view(), name="sign-language"),
+
 ]
 urlpatterns += router.urls
