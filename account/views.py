@@ -25,7 +25,7 @@ from .serializers import STTRequestSerializer
 from service.STT.STT import ASLTranslatorFinal
 from .serializers import SignLanguageRequestSerializer, SignLanguageResponseSerializer
 from service.TTS.TTS import SignLanguageVideoGenerator
-
+import os
 #---------------
 # User View
 #---------------
@@ -304,11 +304,11 @@ class STTView(APIView):
 
 
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+signs_dict_path = os.path.join(BASE_DIR, 'signs_dictionary.json')
 
 SIGN_GENERATOR = SignLanguageVideoGenerator(
-    signs_dict_path="/Users/obadaqafisheh/Rafeeq/Rafeeq/service/TTS/signs_dictionary.json"
-)
-
+    signs_dict_path)
 
 class SignLanguageView(APIView):
     permission_classes = []  # AllowAny
