@@ -16,6 +16,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         token['email'] = user.email
         token['user_type'] = user.user_type
+        token['in_home'] = user.in_home
+        token['current_location'] = user.current_location
         return token
 
     def validate(self, attrs):
@@ -39,7 +41,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             patient = (
                 user.patients
                 .filter(user_type__in=['blind', 'deaf'])
-                .values('id', 'username', 'email', 'user_type')
+                .values('id', 'username', 'email', 'user_type','in_home','current_location')
                 .first()
             )
             user_data["patient"] = patient

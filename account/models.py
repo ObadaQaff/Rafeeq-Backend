@@ -12,7 +12,7 @@ class CustomUser(AbstractUser):
 
     #Address and location fields
     address = models.CharField(max_length=1000, blank=True, null=True)
-    curent_location = models.CharField(max_length=1000, blank=True, null=True)
+    current_location = models.CharField(max_length=1000, blank=True, null=True)
     in_home = models.BooleanField(default=True , blank=True, null=True)
 
 
