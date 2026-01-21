@@ -123,7 +123,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'phone', 'age', 'address','curent_location','in_home','gender', 'can_write','can_speak_with_sign_language'
+        fields = ['id', 'username', 'email', 'phone', 'age', 'address','current_location','in_home','gender', 'can_write','can_speak_with_sign_language'
                   ,'is_active', 'user_type','device_token']
 
 class SmartVisionRequestSerializer(serializers.Serializer):
