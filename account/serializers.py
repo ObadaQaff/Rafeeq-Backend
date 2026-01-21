@@ -146,22 +146,26 @@ class PostSerializer(serializers.ModelSerializer):
         write_only=True
     )
     city_data = CitySerializer(source='city', read_only=True)
+
     volunteer = UserSerializer(read_only=True)
+    
+
+    help_requesters = UserSerializer(many=True, read_only=True)
     volunteer_id = serializers.PrimaryKeyRelatedField(
-        source='volunteer',  # points to the model field
+        source='volunteer',
         queryset=CustomUser.objects.filter(user_type='volunteer'),
         write_only=True,
         required=False,
         allow_null=True
     )
 
-    help_requesters = UserSerializer(many=True, read_only=True)
     help_requesters_ids = serializers.PrimaryKeyRelatedField(
         source='help_requesters',
         queryset=CustomUser.objects.filter(user_type='volunteer'),
         many=True,
         write_only=True,
-        required=False
+        required=False,
+        allow_empty=True
     )
     class Meta:
         model = Post
@@ -169,17 +173,27 @@ class PostSerializer(serializers.ModelSerializer):
             'id',
             'title',
             'content',
-            'city',      # FK → client sends ID
+            'city',      
             'city_data', 
-            'author',    # FK → read-only
-            'volunteer',       # nested output
-            'volunteer_id',    # input ID
-            'help_requesters', # nested output
-            'help_requesters_ids', # input IDs
+            'author',    
+            'volunteer',       
+            'volunteer_id',    
+            'help_requesters', 
+            'help_requesters_ids',
             'state',
             'created_at',
             'updated_at',
         ]
+        def validate_volunteer_id(self, value):
+            if value == 0:
+                return None
+            return value
+
+        def validate_help_requesters_ids(self, value):
+            if isinstance(value, list):
+                return [v for v in value if v != 0]
+            return value
+
 
 class STTRequestSerializer(serializers.Serializer):
     frames = serializers.ListField(
