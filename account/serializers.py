@@ -144,7 +144,23 @@ class PostSerializer(serializers.ModelSerializer):
         write_only=True
     )
     city_data = CitySerializer(source='city', read_only=True)
+    volunteer = UserSerializer(read_only=True)
+    volunteer_id = serializers.PrimaryKeyRelatedField(
+        source='volunteer',  # points to the model field
+        queryset=CustomUser.objects.filter(user_type='volunteer'),
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
+    help_requesters = UserSerializer(many=True, read_only=True)
+    help_requesters_ids = serializers.PrimaryKeyRelatedField(
+        source='help_requesters',
+        queryset=CustomUser.objects.filter(user_type='volunteer'),
+        many=True,
+        write_only=True,
+        required=False
+    )
     class Meta:
         model = Post
         fields = [
@@ -154,8 +170,10 @@ class PostSerializer(serializers.ModelSerializer):
             'city',      # FK → client sends ID
             'city_data', 
             'author',    # FK → read-only
-            'volunteer',
-            'help_requesters',
+            'volunteer',       # nested output
+            'volunteer_id',    # input ID
+            'help_requesters', # nested output
+            'help_requesters_ids', # input IDs
             'state',
             'created_at',
             'updated_at',
