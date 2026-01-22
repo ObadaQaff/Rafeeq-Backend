@@ -252,11 +252,58 @@ class SmartVisionView(APIView):
 #----------------
 # STT ViewSet
 #----------------
+# class STTView(APIView):
+#     permission_classes = []  # AllowAny
+#     @swagger_auto_schema(
+#         request_body=STTRequestSerializer,
+#         responses={200: "Success"}
+#     )
+#     def post(self, request):
+#         serializer = STTRequestSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+
+#         frames_base64 = serializer.validated_data['frames']
+
+#         # Decode base64 → bytes
+#         frames_bytes = []
+#         for frame in frames_base64:
+#             try:
+#                 frames_bytes.append(base64.b64decode(frame))
+#             except Exception:
+#                 return Response(
+#                     {"success": False, "error": "Invalid base64 frame"},
+#                     status=400
+#                 )
+
+#         translator = ASLTranslatorFinal()
+#         result = translator.process_frames_from_flutter(frames_bytes)
+
+#         if not result['success']:
+#             return Response(result, status=400)
+
+#         # Convert bytes → base64 for Flutter
+#         response = {
+#             "success": True,
+#             "has_audio": result["has_audio"],
+#             "has_text": result["has_text"],
+#             "audio_file": (
+#                 base64.b64encode(result["audio_file"]).decode()
+#                 if result["audio_file"] else None
+#             ),
+#             "text_file": (
+#                 result["text_file"].decode("utf-8")
+#                 if result["text_file"] else None
+#             )
+#         }
+
+#         return Response(response, status=200)
+    
 class STTView(APIView):
     permission_classes = []  # AllowAny
+
     @swagger_auto_schema(
         request_body=STTRequestSerializer,
-        responses={200: "Success"}
+        responses={200: STTRequestSerializer, 400: "Bad Request"}
     )
     def post(self, request):
         serializer = STTRequestSerializer(data=request.data)
@@ -264,40 +311,49 @@ class STTView(APIView):
 
         frames_base64 = serializer.validated_data['frames']
 
-        # Decode base64 → bytes
         frames_bytes = []
-        for frame in frames_base64:
+        for i, frame in enumerate(frames_base64):
             try:
                 frames_bytes.append(base64.b64decode(frame))
-            except Exception:
+            except Exception as e:
                 return Response(
-                    {"success": False, "error": "Invalid base64 frame"},
+                    {"success": False, "error": f"Invalid base64 at frame {i}: {str(e)}"},
                     status=400
                 )
 
         translator = ASLTranslatorFinal()
         result = translator.process_frames_from_flutter(frames_bytes)
 
-        if not result['success']:
+        if not result.get('success', False):
             return Response(result, status=400)
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
 
-        # Convert bytes → base64 for Flutter
+        audio_file_bytes = result["audio_file"]
+        if audio_file_bytes:
+            path = default_storage.save("uploads/audio_output.wav", ContentFile(audio_file_bytes))
+            audio_url = default_storage.url(path)
+        else:
+            audio_url = None
+
         response = {
             "success": True,
             "has_audio": result["has_audio"],
             "has_text": result["has_text"],
-            "audio_file": (
-                base64.b64encode(result["audio_file"]).decode()
-                if result["audio_file"] else None
-            ),
-            "text_file": (
-                result["text_file"].decode("utf-8")
-                if result["text_file"] else None
-            )
+            "audio_file_url": audio_url,
+            "text_file": result["text_file"].decode("utf-8") if result["text_file"] else None
         }
-
         return Response(response, status=200)
-    
+
+                # response = {
+                #     "success": True,
+                #     "has_audio": result.get("has_audio", False),
+                #     "has_text": result.get("has_text", False),
+                #     "audio_file": base64.b64encode(result["audio_file"]).decode() if result.get("audio_file") else None,
+                #     "text_file": result["text_file"].decode("utf-8") if result.get("text_file") else None,
+                # }
+
+                # return Response(response, status=200)
 
 
 
