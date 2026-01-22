@@ -297,7 +297,8 @@ class SmartVisionView(APIView):
 #         }
 
 #         return Response(response, status=200)
-    
+from django.http import FileResponse
+
 class STTView(APIView):
     permission_classes = []  # AllowAny
 
@@ -343,7 +344,7 @@ class STTView(APIView):
             "audio_file_url": audio_url,
             "text_file": result["text_file"].decode("utf-8") if result["text_file"] else None
         }
-        return Response(response, status=200)
+        return FileResponse(open(path, 'rb'), content_type='audio/wav')
 
                 # response = {
                 #     "success": True,
