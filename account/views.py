@@ -297,7 +297,13 @@ class SmartVisionView(APIView):
 #         }
 
 #         return Response(response, status=200)
+
+from django.http import FileResponse, HttpResponse
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+import io
 from django.http import FileResponse
+from django.http import HttpResponse
 
 class STTView(APIView):
     permission_classes = []  # AllowAny
@@ -327,24 +333,18 @@ class STTView(APIView):
 
         if not result.get('success', False):
             return Response(result, status=400)
-        from django.core.files.base import ContentFile
-        from django.core.files.storage import default_storage
+        
 
-        audio_file_bytes = result["audio_file"]
-        if audio_file_bytes:
-            path = default_storage.save("uploads/audio_output.wav", ContentFile(audio_file_bytes))
-            audio_url = default_storage.url(path)
-        else:
-            audio_url = None
+        audio_bytes = result.get("audio_file")
+        if not audio_bytes:
+            return Response({"success": False, "error": "No audio generated"}, status=400)
 
-        response = {
-            "success": True,
-            "has_audio": result["has_audio"],
-            "has_text": result["has_text"],
-            "audio_file_url": audio_url,
-            "text_file": result["text_file"].decode("utf-8") if result["text_file"] else None
-        }
-        return FileResponse(open(path, 'rb'), content_type='audio/wav')
+        res = HttpResponse(audio_bytes, content_type="audio/mpeg")
+        res["Content-Disposition"] = 'inline; filename="audio_output.mp3"'
+        res["Content-Length"] = str(len(audio_bytes))
+        res["Cache-Control"] = "no-store"
+        return res
+
 
                 # response = {
                 #     "success": True,
