@@ -10,6 +10,7 @@ from difflib import SequenceMatcher
 
 class SignLanguageVideoGenerator:
     def __init__(self, signs_dict_path):
+        
         with open(signs_dict_path, 'r', encoding='utf-8') as f:
             self.signs_dict = json.load(f)
         
@@ -627,6 +628,7 @@ class SignLanguageVideoGenerator:
     
     def process_from_flutter(self, input_data, input_type='text'):
         try:
+            self.reload_if_changed()
             recognized_text = None
             temp_audio_path = None
             

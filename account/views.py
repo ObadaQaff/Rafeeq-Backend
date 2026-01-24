@@ -297,34 +297,27 @@ class SmartVisionView(APIView):
 #         }
 
 #         return Response(response, status=200)
-import io
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-from django.http import FileResponse
-
-MAX_AUDIO_BYTES = 2 * 1024 * 1024  # 2MB (change as you want)
+from django.http import FileResponse, HttpResponse
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+import time
+import os
 
 class STTView(APIView):
-    permission_classes = []
+    permission_classes = []  # AllowAny
 
     @swagger_auto_schema(
         request_body=STTRequestSerializer,
-        responses={
-            200: openapi.Response(
-                description="MP3 audio",
-                schema=openapi.Schema(type=openapi.TYPE_FILE)
-            ),
-            400: "Bad Request"
-        },
-        produces=["audio/mpeg"],
+        responses={200: STTRequestSerializer, 400: "Bad Request"}
     )
     def post(self, request):
         serializer = STTRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        frames_base64 = serializer.validated_data["frames"]
+        frames_base64 = serializer.validated_data['frames']
 
         frames_bytes = []
         for i, frame in enumerate(frames_base64):
@@ -339,35 +332,28 @@ class STTView(APIView):
         translator = ASLTranslatorFinal()
         result = translator.process_frames_from_flutter(frames_bytes)
 
-        if not result.get("success", False):
+        if not result.get('success', False):
             return Response(result, status=400)
+        audio_file_bytes = result["audio_file"]
+        audio_file_bytes = result.get("audio_file")
 
-        audio_bytes = result.get("audio_file")
-        if not audio_bytes:
-            return Response({"success": False, "error": "No audio generated"}, status=400)
+        if audio_file_bytes:
+            timestamp = int(time.time() * 1000)
+            filename = f"stt_audio_{timestamp}.mp3"
 
-        # ---- Limit response length (hard cap) ----
-        if len(audio_bytes) > MAX_AUDIO_BYTES:
+            # ✅ احفظ داخل MEDIA_ROOT
+            relative_path = os.path.join("stt", filename)  # folder inside media
+            saved_path = default_storage.save(relative_path, ContentFile(audio_file_bytes))
+
+            # ✅ رجّع URL مثل SmartVision
+            audio_url = settings.MEDIA_URL + saved_path.replace("\\", "/")
+
             return Response(
-                {
-                    "success": False,
-                    "error": "Audio too large",
-                    "max_bytes": MAX_AUDIO_BYTES,
-                    "audio_bytes": len(audio_bytes),
-                },
-                status=413
+                {"success": True, "audio_file": audio_url},
+                status=200
             )
 
-        # ---- Stream as file (safer for binary) ----
-        buf = io.BytesIO(audio_bytes)
-        buf.seek(0)
-
-        res = FileResponse(buf, content_type="audio/mpeg")
-        res["Content-Disposition"] = 'inline; filename="audio_output.mp3"'
-        res["Cache-Control"] = "no-store"
-        # Optional: FileResponse usually handles this, but you can keep it:
-        res["Content-Length"] = str(len(audio_bytes))
-        return res
+        return Response({"success": False, "error": "No audio generated"}, status=400)
 
                 # response = {
                 #     "success": True,
