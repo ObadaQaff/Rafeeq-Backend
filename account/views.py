@@ -386,7 +386,11 @@ from pathlib import Path
 
 class SignLanguageView(APIView):
     permission_classes = []
-
+    
+    @swagger_auto_schema(
+        request_body=SignLanguageRequestSerializer,
+        responses={200: SignLanguageResponseSerializer, 400: "Bad Request"}
+    )
     def post(self, request):
         serializer = SignLanguageRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
