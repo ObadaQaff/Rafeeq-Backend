@@ -745,7 +745,7 @@ class SignLanguageVideoGenerator:
             # base_url example: "http://127.0.0.1:8000" or "https://api.yoursite.com"
             # We return a URL under MEDIA_URL: /media/generated_signs/<filename>
             filename = os.path.basename(merged_video_path)
-            relative_url = f"/media/generated_signs/{filename}"
+            relative_url = f"/audio/generated_signs/{filename}"
             full_url = f"{base_url}{relative_url}" if base_url else relative_url
 
             return {
