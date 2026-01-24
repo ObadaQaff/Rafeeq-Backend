@@ -628,7 +628,6 @@ class SignLanguageVideoGenerator:
     
     def process_from_flutter(self, input_data, input_type='text'):
         try:
-            self.reload_if_changed()
             recognized_text = None
             temp_audio_path = None
             
