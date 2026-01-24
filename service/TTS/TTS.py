@@ -7,28 +7,115 @@ from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 import speech_recognition as sr
 from difflib import SequenceMatcher
+import json
+import os
+import re
+from pathlib import Path
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor
+from difflib import SequenceMatcher
+from pathlib import Path, PureWindowsPath
+import json
+import os
+import re
+from pathlib import Path, PureWindowsPath
+from concurrent.futures import ThreadPoolExecutor
 
 class SignLanguageVideoGenerator:
-    def __init__(self, signs_dict_path):
-        
-        with open(signs_dict_path, 'r', encoding='utf-8') as f:
-            self.signs_dict = json.load(f)
-        
+    # Detect Windows drive anywhere in the string (works even if path got prefixed by unix folder)
+    _WIN_DRIVE_RE = re.compile(r"[A-Za-z]:\\")   # e.g. C:\Users\...
+    
+    def __init__(self, signs_dict_path, signs_dir=None):
+        with open(signs_dict_path, "r", encoding="utf-8") as f:
+            raw_dict = json.load(f)
+
+        signs_dict_path = Path(signs_dict_path).resolve()
+
+        # ✅ Folder that contains the .mp4 files on THIS machine
+        # Recommended: always pass signs_dir from Django settings/view for local+server consistency.
+        if signs_dir:
+            self.signs_dir = Path(signs_dir).resolve()
+        else:
+            # If JSON is in .../service/TTS/signs_dictionary.json, signs folder is .../service/TTS/signs/
+            self.signs_dir = (signs_dict_path.parent / "signs").resolve()
+
+        # ✅ Convert every dict value to a valid local path
+        self.signs_dict = {k: str(self._resolve_video_path(v)) for k, v in raw_dict.items()}
+
+        # Optional: warn about missing files (helps debugging on server)
+        # self._warn_missing_files(limit=20)
+
+        # ---- your existing settings ----
         self.motion_threshold_percentile = 20
         self.trim_start_buffer = 0.1
         self.trim_end_buffer = 0.1
-        self.similarity_threshold = 0.75  
+        self.similarity_threshold = 0.75
         self.fuzzy_threshold = 0.70
-        
-        self._normalized_keys_cache = {
-            self.normalize_text(k): k for k in self.signs_dict.keys()
-        }
-        
+
+        self._normalized_keys_cache = {self.normalize_text(k): k for k in self.signs_dict.keys()}
+
         self._build_synonyms_map()
         self._build_search_index()
-        
+
         self._executor = ThreadPoolExecutor(max_workers=4)
-    
+
+    def _resolve_video_path(self, raw_path: str) -> Path:
+        """
+        Portable path resolver:
+        - "C:\\Users\\...\\file.mp4" or any string containing "C:\\" -> signs_dir/file.mp4
+        - "/abs/unix/file.mp4" -> keep as is
+        - "file.mp4" or "sub/file.mp4" -> signs_dir/file.mp4
+        """
+        if not raw_path:
+            return Path(raw_path)
+
+        raw_path = str(raw_path).strip()
+
+        # ✅ Windows drive path anywhere in the string
+        m = self._WIN_DRIVE_RE.search(raw_path)
+        if m:
+            win_part = raw_path[m.start():]                 # "C:\Users\...\file.mp4"
+            filename = PureWindowsPath(win_part).name       # "file.mp4" (works on mac/linux)
+            return self.signs_dir / filename
+
+        p = Path(raw_path)
+
+        # ✅ Unix/mac absolute path
+        if p.is_absolute():
+            return p
+
+        # ✅ Relative path / filename
+        return self.signs_dir / p
+
+    def _warn_missing_files(self, limit=20):
+        missing = [(k, v) for k, v in self.signs_dict.items() if not os.path.exists(v)]
+        if missing:
+            print(f"[SignLanguage] Missing {len(missing)} video files under: {self.signs_dir}")
+            for k, v in missing[:limit]:
+                print("  -", k, "=>", v)
+            if len(missing) > limit:
+                print(f"  ... and {len(missing)-limit} more")
+
+    # ------------------------------
+    # keep your existing methods below
+    # ------------------------------
+
+    @lru_cache(maxsize=1024)
+    def normalize_text(self, text):
+        arabic_diacritics = re.compile(r"[ّ َ ً ُ ٌ ِ ٍ ْ ـ]")
+        text = re.sub(arabic_diacritics, "", text)
+        text = re.sub("[إأٱآا]", "ا", text)
+        text = re.sub("ى", "ي", text)
+        text = re.sub("ة", "ه", text)
+        return text
+
+    def _build_synonyms_map(self):
+        self.synonyms = {}
+        self.reverse_synonyms = {}
+
+    def _build_search_index(self):
+        pass
+
     def _build_synonyms_map(self):
         self.synonyms = {
             'طبيب': ['دكتور', 'الدكتور'],
@@ -560,62 +647,61 @@ class SignLanguageVideoGenerator:
             end = max(duration - 0.15, duration * 0.85)
             return clip.subclip(start, end)
     
-    def merge_sign_videos(self, video_paths):
-        from moviepy.editor import VideoFileClip, concatenate_videoclips  # <- lazy import
-        if not video_paths:
+    
+    def merge_sign_videos(self, video_paths, output_dir=None):
+        import uuid
+        from pathlib import Path
+        from moviepy.editor import VideoFileClip, concatenate_videoclips
+
+        existing_paths = [p for p in video_paths if p and os.path.exists(p)]
+        if not existing_paths:
             return None
-        
+
         clips = []
-        
-        first_clip = VideoFileClip(video_paths[0])
-        target_width = first_clip.w
-        target_height = first_clip.h
-        target_fps = first_clip.fps
+        first_clip = VideoFileClip(existing_paths[0])
+        target_width, target_height, target_fps = first_clip.w, first_clip.h, first_clip.fps
         first_clip.close()
-        
-        for path in video_paths:
-            if not os.path.exists(path):
-                continue
-            
+
+        for path in existing_paths:
             try:
                 clip = self.trim_video_smart(path)
-                
                 if clip.w != target_width or clip.h != target_height:
                     clip = clip.resize((target_width, target_height))
-                
                 if clip.fps != target_fps:
                     clip = clip.set_fps(target_fps)
-                
                 clips.append(clip)
-            except Exception as e:
-                print(f"Error processing {path}: {e}")
+            except:
                 continue
-        
+
         if not clips:
             return None
-        
+
         final_clip = concatenate_videoclips(clips, method="compose")
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
-            output_path = temp_file.name
-        
+
+        # ✅ output location
+        out_dir = Path(output_dir).resolve() if output_dir else Path.cwd()
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"sign_{uuid.uuid4().hex}.mp4"
+        output_path = str(out_dir / filename)
+
         final_clip.write_videofile(
             output_path,
-            codec='libx264',
-            audio_codec='aac',
+            codec="libx264",
+            audio_codec="aac",
             fps=target_fps,
-            preset='ultrafast',  
-            bitrate='8000k',
+            preset="ultrafast",
+            bitrate="2000k",
             threads=4,
             logger=None
         )
-        
-        for clip in clips:
-            clip.close()
+
+        for c in clips:
+            c.close()
         final_clip.close()
-        
+
         return output_path
-    
+
     def encode_video_to_base64(self, video_path):
         try:
             with open(video_path, 'rb') as video_file:
@@ -626,82 +712,56 @@ class SignLanguageVideoGenerator:
             print(f"Error encoding video: {e}")
             return None
     
-    def process_from_flutter(self, input_data, input_type='text'):
+    def process_from_flutter(self, input_data, input_type="text", output_dir=None, base_url=None):
         try:
             recognized_text = None
             temp_audio_path = None
-            
-            if input_type == 'audio':
+
+            if input_type == "audio":
                 temp_audio_path = self.decode_base64_audio(input_data)
                 recognized_text = self.speech_to_text(temp_audio_path)
-                
                 if temp_audio_path and os.path.exists(temp_audio_path):
                     os.remove(temp_audio_path)
-                
                 if not recognized_text:
-                    return {
-                        'success': False,
-                        'error': 'فشل في التعرف على الصوت',
-                        'recognized_text': None,
-                        'video_base64': None,
-                        'missing_words': [],
-                        'found_matches': []
-                    }
-                
+                    return {"success": False, "error": "Speech recognition failed", "recognized_text": None,
+                            "video_url": None, "missing_words": [], "found_matches": []}
                 text = recognized_text
             else:
                 text = input_data
-            
+
             video_paths, missing_words, found_matches = self.text_to_signs(text)
-            
             if not video_paths:
-                return {
-                    'success': False,
-                    'error': 'لا توجد إشارات متاحة',
-                    'recognized_text': recognized_text,
-                    'video_base64': None,
-                    'missing_words': missing_words,
-                    'found_matches': found_matches,
-                    'total_signs': 0
-                }
-            
-            merged_video_path = self.merge_sign_videos(video_paths)
-            
+                return {"success": False, "error": "No signs available", "recognized_text": recognized_text,
+                        "video_url": None, "missing_words": missing_words, "found_matches": found_matches,
+                        "total_signs": 0}
+
+            merged_video_path = self.merge_sign_videos(video_paths, output_dir=output_dir)
             if not merged_video_path:
-                return {
-                    'success': False,
-                    'error': 'فشل في دمج الفيديو',
-                    'recognized_text': recognized_text,
-                    'video_base64': None,
-                    'missing_words': missing_words,
-                    'found_matches': found_matches,
-                    'total_signs': len(video_paths)
-                }
-            
-            video_base64 = self.encode_video_to_base64(merged_video_path)
-            
-            if os.path.exists(merged_video_path):
-                os.remove(merged_video_path)
-            
+                return {"success": False, "error": "Failed to merge video", "recognized_text": recognized_text,
+                        "video_url": None, "missing_words": missing_words, "found_matches": found_matches,
+                        "total_signs": len(video_paths)}
+
+            # ✅ build URL
+            # base_url example: "http://127.0.0.1:8000" or "https://api.yoursite.com"
+            # We return a URL under MEDIA_URL: /media/generated_signs/<filename>
+            filename = os.path.basename(merged_video_path)
+            relative_url = f"/media/generated_signs/{filename}"
+            full_url = f"{base_url}{relative_url}" if base_url else relative_url
+
             return {
-                'success': True,
-                'recognized_text': recognized_text,
-                'video_base64': video_base64,
-                'missing_words': missing_words,
-                'found_matches': found_matches,
-                'total_signs': len(video_paths)
+                "success": True,
+                "recognized_text": recognized_text,
+                "video_url": full_url,
+                "video_path": merged_video_path,  # optional for debugging
+                "missing_words": missing_words,
+                "found_matches": found_matches,
+                "total_signs": len(video_paths),
             }
-            
+
         except Exception as e:
-            print(f"Error: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'recognized_text': None,
-                'video_base64': None,
-                'missing_words': [],
-                'found_matches': []
-            }
+            return {"success": False, "error": str(e), "recognized_text": None,
+                    "video_url": None, "missing_words": [], "found_matches": []}
+
     
     def __del__(self):
         """Cleanup thread pool"""

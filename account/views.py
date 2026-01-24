@@ -368,30 +368,25 @@ class STTView(APIView):
 
 
 
+from pathlib import Path
+import os
 
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-signs_dict_path = os.path.join(BASE_DIR, 'signs_dictionary.json')
+# views.py is: /Users/obadaqafisheh/Rafeeq/Rafeeq/account/views.py
+BASE_DIR = Path(__file__).resolve().parents[1]          # /Users/obadaqafisheh/Rafeeq/Rafeeq
+SIGNS_DIR = BASE_DIR / "service" / "TTS" / "signs"
+signs_dict_path = BASE_DIR / "service" / "TTS" / "signs_dictionary.json"
 
 SIGN_GENERATOR = SignLanguageVideoGenerator(
-    signs_dict_path)
+    signs_dict_path=str(signs_dict_path),
+    signs_dir=str(SIGNS_DIR),   # ✅ works on local + server
+)
+
+from django.conf import settings
+from pathlib import Path
 
 class SignLanguageView(APIView):
-    permission_classes = []  # AllowAny
+    permission_classes = []
 
-    @swagger_auto_schema(
-        operation_summary="Convert Arabic text or audio to sign language video",
-        operation_description="""
-        - Send **Arabic text** OR **base64 audio**
-        - Returns **merged sign language video (base64)**
-        - Reports missing words and fuzzy matches
-        """,
-        request_body=SignLanguageRequestSerializer,
-        responses={
-            200: SignLanguageResponseSerializer,
-            400: "Bad Request"
-        }
-    )
     def post(self, request):
         serializer = SignLanguageRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -399,12 +394,29 @@ class SignLanguageView(APIView):
         input_type = serializer.validated_data["input_type"]
         input_data = serializer.validated_data["input_data"]
 
+        # ✅ where generated videos will be saved
+        out_dir = Path(settings.MEDIA_ROOT) / "generated_signs"
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # ✅ build base url correctly (works local + server)
+        base_url = request.build_absolute_uri("/")[:-1]  # "http://host:port"
+
         result = SIGN_GENERATOR.process_from_flutter(
             input_data=input_data,
-            input_type=input_type
+            input_type=input_type,
+            output_dir=str(out_dir),
+            base_url=base_url
         )
 
         if not result.get("success"):
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(result, status=status.HTTP_200_OK)
+        # ✅ return small JSON with URL
+        return Response({
+            "success": True,
+            "recognized_text": result.get("recognized_text"),
+            "video_url": result.get("video_url"),
+            "missing_words": result.get("missing_words", []),
+            "found_matches": result.get("found_matches", []),
+            "total_signs": result.get("total_signs", 0),
+        }, status=status.HTTP_200_OK)
