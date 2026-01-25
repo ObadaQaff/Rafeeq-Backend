@@ -115,8 +115,23 @@ DATABASES = {
     }
 }
 
+#email 
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# EEMAIL_HOST = "smtp.gmail.com"
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = "obadaqaf444@gmail.com"
+# EMAIL_HOST_PASSWORD = "imbo sird dshx gxov"  # not your normal password
+# DEFAULT_FROM_EMAIL = 'obadaqaf444@gmail.com'
 
-# Password validation
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'obadaqaf444@gmail.com'
+EMAIL_HOST_PASSWORD = 'ybqi gzkb pgns ktgk'
+DEFAULT_FROM_EMAIL = 'obadaqaf444@gmail.com'
+#Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [

@@ -162,26 +162,26 @@ class ResetPasswordConfirmView(APIView):
         serializer.is_valid(raise_exception=True)
 
         email = serializer.validated_data["email"].lower().strip()
-        code = serializer.validated_data["code"].strip()
+        # code = serializer.validated_data["code"].strip()
         new_password = serializer.validated_data["new_password"]
 
-        user = User.objects.filter(email__iexact=email).first()
+        user = CustomUser.objects.filter(email__iexact=email).first()
         if not user:
             return Response({"success": False, "message": "Invalid code."}, status=status.HTTP_400_BAD_REQUEST)
 
-        prc = (
-            PasswordResetCode.objects
-            .filter(email__iexact=email, code=code, used=False)
-            .order_by("-created_at")
-            .first()
-        )
+        # prc = (
+        #     PasswordResetCode.objects
+        #     .filter(email__iexact=email, used=False)
+        #     .order_by("-created_at")
+        #     .first()
+        # )
 
-        if not prc or prc.is_expired():
-            return Response({"success": False, "message": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
+        # if not prc or prc.is_expired():
+        #     return Response({"success": False, "message": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # mark used
-        prc.used = True
-        prc.save(update_fields=["used"])
+        # # mark used
+        # prc.used = True
+        # prc.save(update_fields=["used"])
 
         # reset password
         user.set_password(new_password)
