@@ -6,12 +6,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 
-
-
 router = DefaultRouter()
 router.register('users', UserViewSet, basename='user')
 router.register(r'cities', CityViewSet, basename='city')
 router.register(r'posts', PostViewSet, basename='post')
+
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
@@ -24,8 +23,7 @@ urlpatterns = [
     path("sign-language/", SignLanguageView.as_view(), name="sign-language"),
     path("forgot-password/", ForgotPasswordRequestView.as_view(), name="forgot-password"),
     path("reset-password/", ResetPasswordConfirmView.as_view(), name="reset-password"),
-
-
+    path("notify-user/", SendNotificationByUserIdView.as_view(), name="notify-user"),
 ]
 urlpatterns += router.urls
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

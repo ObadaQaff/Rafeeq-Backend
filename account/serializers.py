@@ -21,11 +21,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        device_token = attrs.pop("device_token", None)
+        device_token = self.initial_data.get("device_token")
         data = super().validate(attrs)
         user = self.user
 
-        if device_token:
+        if device_token: 
             user.device_token = device_token
             user.save(update_fields=["device_token"])
         
@@ -59,6 +59,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             )
 
         data["user"] = user_data
+
         return data
 
 
@@ -140,6 +141,14 @@ class ResetPasswordConfirmSerializer(serializers.Serializer):
     new_password = serializers.CharField(min_length=8, write_only=True)
 
 
+from rest_framework import serializers
+
+class SendNotificationSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    title = serializers.CharField(max_length=200)
+    body = serializers.CharField(max_length=1000)
+    data = serializers.DictField(required=False)  # optional extra payload
+    android_channel_id = serializers.CharField(required=False, allow_blank=True)
 
 
 
@@ -238,3 +247,16 @@ class SignLanguageResponseSerializer(serializers.Serializer):
     found_matches = serializers.ListField()
     total_signs = serializers.IntegerField(required=False)
     error = serializers.CharField(required=False)
+from rest_framework import serializers
+
+class SendCallSerializer(serializers.Serializer):
+    to_user_id = serializers.IntegerField()
+    from_user_id = serializers.IntegerField(required=False)
+    caller_name = serializers.CharField(required=False, allow_blank=True)
+
+    call_id = serializers.CharField()
+    room_id = serializers.CharField()
+    ttl = serializers.IntegerField(required=False, default=30)
+
+    android_channel_id = serializers.CharField(required=False, allow_blank=True, default="calls")
+    extra_data = serializers.DictField(required=False, default=dict)

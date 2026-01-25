@@ -100,8 +100,17 @@ TEMPLATES = [
         },
     },
 ]
+import os
+from pathlib import Path
 
-WSGI_APPLICATION = 'wsgi.application'
+BASE_DIR = Path(__file__).resolve().parent
+
+FIREBASE_SERVICE_ACCOUNT_PATH = os.getenv(
+    "FIREBASE_SERVICE_ACCOUNT_PATH",
+    str(BASE_DIR/ "rafeeq-7cc08-firebase-adminsdk-fbsvc-bee11ce78a.json")
+)
+
+#WSGI_APPLICATION = 'wsgi.application'
 
 CORS_ALLOW_ALL_ORIGINS = True
 

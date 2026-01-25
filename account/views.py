@@ -476,3 +476,75 @@ class SignLanguageView(APIView):
             "found_matches": result.get("found_matches", []),
             "total_signs": result.get("total_signs", 0),
         }, status=status.HTTP_200_OK)
+
+
+
+
+
+
+#notification with firebase
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
+from django.contrib.auth import get_user_model
+from drf_yasg.utils import swagger_auto_schema
+
+from .serializers import SendNotificationSerializer
+from .firebase import send_fcm_to_token
+
+User = get_user_model()
+
+class SendNotificationByUserIdView(APIView):
+    permission_classes = [permissions.AllowAny]  # change to IsAuthenticated later
+
+    @swagger_auto_schema(
+        request_body=SendNotificationSerializer,
+        responses={200: "Success", 400: "Bad Request", 404: "User Not Found", 500: "Server Error"}
+    )
+    def post(self, request):
+        serializer = SendNotificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_id = serializer.validated_data["user_id"]
+        title = serializer.validated_data["title"]
+        body = serializer.validated_data["body"]
+        data = serializer.validated_data.get("data") or {}
+        android_channel_id = serializer.validated_data.get("android_channel_id") or None
+
+        user = User.objects.filter(id=user_id).first()
+        if not user:
+            return Response({"success": False, "error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        token = (user.device_token or "").strip()
+        if not token:
+            return Response({"success": False, "error": "User has no device_token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ Detect call mode from data["type"]
+        is_call = (data.get("type") == "incoming_call")
+        ttl_seconds = None
+
+        if is_call:
+            # TTL usually 30 seconds for incoming calls
+            try:
+                ttl_seconds = int(data.get("ttl", 30))
+            except (TypeError, ValueError):
+                ttl_seconds = 30
+
+            # default channel for calls
+            if not android_channel_id:
+                android_channel_id = "calls"
+
+        try:
+            message_id = send_fcm_to_token(
+                token=token,
+                title=title,
+                body=body,
+                data=data,
+                android_channel_id=android_channel_id,
+                is_call=is_call,
+                ttl_seconds=ttl_seconds,
+            )
+            return Response({"success": True, "message_id": message_id}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
