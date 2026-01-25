@@ -126,6 +126,23 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'phone', 'age', 'address','current_location','in_home','gender', 'can_write','can_speak_with_sign_language'
                   ,'is_active', 'user_type','device_token']
 
+
+
+
+#reset pass
+
+class ForgotPasswordRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class ResetPasswordConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(min_length=8, write_only=True)
+
+
+
+
+
 class SmartVisionRequestSerializer(serializers.Serializer):
     image = serializers.ImageField()
   

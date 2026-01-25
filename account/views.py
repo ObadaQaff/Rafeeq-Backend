@@ -79,6 +79,10 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
 
+
+
+
+
 # Custom logout endpoint
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -91,6 +95,101 @@ class LogoutView(APIView):
             return Response({"success": "Logged out successfully"}, status=200)
         except Exception as e:
             return Response({"error": str(e)}, status=400)
+
+
+
+import random
+from django.utils import timezone
+from django.core.mail import send_mail
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
+from django.contrib.auth import get_user_model
+
+from .models import PasswordResetCode
+from .serializers import ForgotPasswordRequestSerializer, ResetPasswordConfirmSerializer
+
+User = get_user_model()
+
+
+class ForgotPasswordRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+    @swagger_auto_schema(
+        request_body=ForgotPasswordRequestSerializer,
+        responses={200: "Success", 400: "Bad Request"}
+    )
+    def post(self, request):
+        serializer = ForgotPasswordRequestSerializer(data=request.data)
+
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"].lower().strip()
+
+        # Always return success (prevents email enumeration)
+        # But only send email if user exists.
+        user = User.objects.filter(email__iexact=email).first()
+        if user:
+            code = f"{random.randint(0, 999999):06d}"
+
+            # invalidate old codes for this email
+            PasswordResetCode.objects.filter(email__iexact=email, used=False).update(used=True)
+
+            PasswordResetCode.objects.create(email=email, code=code)
+
+            send_mail(
+                subject="Password reset code",
+                message=f"Your password reset code is: {code}\nThis code expires in 10 minutes.",
+                from_email=None,   # uses DEFAULT_FROM_EMAIL
+                recipient_list=[email],
+                fail_silently=False,
+            )
+
+        return Response(
+            {"success": True, "message": "If the email exists, a reset code was sent."},
+            status=status.HTTP_200_OK
+        )
+
+
+class ResetPasswordConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+    @swagger_auto_schema(
+        request_body=ResetPasswordConfirmSerializer,
+        responses={200: "Success", 400: "Bad Request"}
+    )
+
+    def post(self, request):
+        serializer = ResetPasswordConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"].lower().strip()
+        code = serializer.validated_data["code"].strip()
+        new_password = serializer.validated_data["new_password"]
+
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({"success": False, "message": "Invalid code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        prc = (
+            PasswordResetCode.objects
+            .filter(email__iexact=email, code=code, used=False)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not prc or prc.is_expired():
+            return Response({"success": False, "message": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # mark used
+        prc.used = True
+        prc.save(update_fields=["used"])
+
+        # reset password
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
+
+        return Response({"success": True, "message": "Password updated successfully."}, status=status.HTTP_200_OK)
+
+
 
 class DeleteOwnAccountView(generics.DestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -249,54 +348,7 @@ class SmartVisionView(APIView):
                 status=500
             )
 
-#----------------
-# STT ViewSet
-#----------------
-# class STTView(APIView):
-#     permission_classes = []  # AllowAny
-#     @swagger_auto_schema(
-#         request_body=STTRequestSerializer,
-#         responses={200: "Success"}
-#     )
-#     def post(self, request):
-#         serializer = STTRequestSerializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
 
-#         frames_base64 = serializer.validated_data['frames']
-
-#         # Decode base64 → bytes
-#         frames_bytes = []
-#         for frame in frames_base64:
-#             try:
-#                 frames_bytes.append(base64.b64decode(frame))
-#             except Exception:
-#                 return Response(
-#                     {"success": False, "error": "Invalid base64 frame"},
-#                     status=400
-#                 )
-
-#         translator = ASLTranslatorFinal()
-#         result = translator.process_frames_from_flutter(frames_bytes)
-
-#         if not result['success']:
-#             return Response(result, status=400)
-
-#         # Convert bytes → base64 for Flutter
-#         response = {
-#             "success": True,
-#             "has_audio": result["has_audio"],
-#             "has_text": result["has_text"],
-#             "audio_file": (
-#                 base64.b64encode(result["audio_file"]).decode()
-#                 if result["audio_file"] else None
-#             ),
-#             "text_file": (
-#                 result["text_file"].decode("utf-8")
-#                 if result["text_file"] else None
-#             )
-#         }
-
-#         return Response(response, status=200)
 from django.http import FileResponse, HttpResponse
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage

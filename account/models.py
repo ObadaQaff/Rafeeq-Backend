@@ -1,9 +1,13 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils import timezone
+from datetime import timedelta
+
+
 
 
 class CustomUser(AbstractUser):
@@ -76,6 +80,25 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return f"{self.username} - {self.user_type}"
 
+
+
+class PasswordResetCode(models.Model):
+    email = models.EmailField(db_index=True)
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+
+    def is_expired(self) -> bool:
+        return timezone.now() > self.created_at + timedelta(minutes=10)
+
+    def __str__(self):
+        return f"{self.email} ({self.code})"
+
+
+
+
+
+
 from django.conf import settings
 from django.db import models
 
@@ -85,13 +108,18 @@ class Post(models.Model):
     
     HELP_WAITING = 0
     IN_HELP_TRIP = 1
-    FINISHED = 2
-    CANCLED = 3
+    COMPLETED = 2
+    PINDING_APPROVAL= 3
+    IN_PROGRESS=4
+    CANCLED=5
+
 
     STATE_CHOICES = [
         (HELP_WAITING, 'Help Waiting'),
         (IN_HELP_TRIP, 'In Help Trip'),
-        (FINISHED, 'Finished Helped'),
+        (COMPLETED, 'Completed'),
+        (PINDING_APPROVAL, 'Pinding Approval'),
+        (IN_PROGRESS, 'In Progress'),
         (CANCLED, 'Canceled')
     ]
 
