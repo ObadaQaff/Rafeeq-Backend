@@ -328,7 +328,7 @@ class SmartVisionView(APIView):
                 base64_image=data["image"],
                 conf_threshold=0.5,
                 enable_ocr=True,
-                force_announce=False,
+                force_announce=True,
             )
 
             if not audio_file:
